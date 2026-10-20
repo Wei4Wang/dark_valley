@@ -1,0 +1,1390 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>谷之暗面</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; overflow: hidden; background: #ece3dc; }
+  body {
+    font-family: "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC",
+                 -apple-system, "Segoe UI", sans-serif;
+    -webkit-font-smoothing: antialiased;
+    color: #3f3833;
+    user-select: none;
+    cursor: default;
+    transition: background-color 1.2s ease;
+  }
+  canvas { display: block; }
+
+  .hud { position: fixed; left: 36px; top: 32px; pointer-events: none; }
+  .title { font-size: 15px; font-weight: 500; letter-spacing: .34em; }
+  .sub { font-size: 11px; color: #a89a8b; margin-top: 8px; letter-spacing: .1em; }
+  .status { margin-top: 26px; font-size: 13px; letter-spacing: .18em; color: #a89a8b; transition: color .45s ease; }
+  .status.on { color: #b5714a; }
+  .status.warn { color: #a8503c; }
+
+  .hint {
+    position: fixed; left: 36px; bottom: 30px;
+    display: flex; gap: 22px; flex-wrap: wrap;
+    font-size: 11.5px; color: #a89a8b; letter-spacing: .06em;
+    pointer-events: none;
+  }
+  .hint b { font-weight: 500; color: #8d7f72; }
+
+  .date {
+    position: fixed; right: 44px; top: 34px;
+    font-size: 12px; letter-spacing: .2em; color: #a89a8b;
+    opacity: 0; transition: opacity 1.8s ease; pointer-events: none;
+  }
+  .date.show { opacity: 1; }
+
+  #fade {
+    position: fixed; inset: 0; background: #1a1614;
+    opacity: 0; pointer-events: none; transition: opacity .5s ease;
+  }
+  #fade.on { opacity: 1; }
+
+  #end {
+    position: fixed; inset: 0; background: #14110f;
+    display: flex; align-items: center; justify-content: center;
+    opacity: 0; pointer-events: none; transition: opacity 2.4s ease;
+  }
+  #end.on { opacity: 1; pointer-events: auto; cursor: pointer; }
+  #end p {
+    font-size: 15px; letter-spacing: .5em; color: #e8ddd3;
+    opacity: 0; transition: opacity 2.2s ease .8s;
+  }
+  #end.on p { opacity: 1; }
+
+  #subtitle {
+    position: fixed; left: 0; right: 0; bottom: 18%;
+    text-align: center; pointer-events: none; z-index: 15;
+    padding: 0 60px;
+  }
+  #subtitle .line {
+    display: block; font-size: 16px; letter-spacing: .18em;
+    color: #4a423c; line-height: 2.1;
+    opacity: 0; transform: translateY(8px);
+    transition: opacity 1.4s ease, transform 1.4s ease;
+  }
+  #subtitle .line.show { opacity: 1; transform: translateY(0); }
+
+  #select {
+    position: fixed; inset: 0; z-index: 20;
+    background: #f4eee8;
+    display: flex; align-items: center; justify-content: center;
+    transition: opacity .45s ease;
+  }
+  #select.hide { opacity: 0; pointer-events: none; }
+  .sel-wrap { text-align: center; }
+  .sel-title { font-size: 20px; font-weight: 500; letter-spacing: .52em; margin-left: .52em; }
+  .sel-sub { font-size: 11px; color: #ab9c8d; letter-spacing: .3em; margin-top: 16px; margin-left: .3em; }
+  .sel-grid { display: flex; gap: 14px; margin-top: 46px; }
+  .card {
+    width: 128px; padding: 20px 10px 18px;
+    border: 0.5px solid rgba(150,120,100,.3); border-radius: 10px;
+    background: rgba(255,255,255,.55); cursor: pointer;
+    font-family: inherit; color: inherit;
+    transition: background .22s ease, transform .22s ease, border-color .22s ease;
+  }
+  .card:hover { background: #fff; transform: translateY(-4px); border-color: rgba(180,120,90,.55); }
+  .card .num { display: block; font-size: 10.5px; color: #b3a08d; letter-spacing: .2em; }
+  .card .nm { display: block; font-size: 15px; margin-top: 12px; letter-spacing: .12em; }
+  .card .mech { display: block; font-size: 10.5px; color: #ab9c8d; margin-top: 9px; letter-spacing: .1em; }
+  .card.done .nm { color: #b5714a; }
+  .sel-foot { margin-top: 44px; font-size: 11px; color: #b6a798; letter-spacing: .12em; }
+  #menuBtn {
+    position: fixed; right: 42px; bottom: 28px; z-index: 5;
+    background: none; border: 0.5px solid rgba(150,120,100,.35);
+    border-radius: 8px; padding: 7px 14px;
+    font-family: inherit; font-size: 11.5px; color: #8d7f72;
+    letter-spacing: .14em; cursor: pointer;
+    transition: background .2s ease, border-color .2s ease;
+  }
+  #menuBtn:hover { background: #fff; border-color: rgba(180,120,90,.5); }
+</style>
+</head>
+<body>
+
+<canvas id="stage"></canvas>
+
+<div class="hud">
+  <div class="title">谷之暗面</div>
+  <div class="sub" id="sub"></div>
+  <div class="status" id="status"></div>
+</div>
+
+<div class="date" id="date"></div>
+<div class="hint" id="hint"></div>
+
+<div id="select">
+  <div class="sel-wrap">
+    <div class="sel-title">谷之暗面</div>
+    <div class="sel-sub">选择章节</div>
+    <div class="sel-grid" id="selGrid"></div>
+    <div class="sel-foot">右键 旋转建筑　·　左键 走路　·　R 重来</div>
+  </div>
+</div>
+
+<button id="menuBtn">章节</button>
+
+<div id="fade"></div>
+<div id="subtitle"></div>
+<div id="end"><p>只有从这里看。</p></div>
+
+<script>
+'use strict';
+
+/* =========================================================
+   《谷之暗面》
+   核心规则：屏幕上的投影连通 = 可以走。
+   一 第一面 · 旋转    二 巧合 · 折叠
+   三 最后一格 · 给予  四 暗面 · 双视角
+   ========================================================= */
+
+const DEG = Math.PI / 180;
+
+const VIEW_ISO = { cy: Math.cos(45 * DEG), sy: Math.sin(45 * DEG),
+                   sp: Math.sin(35.264 * DEG), cp: Math.cos(35.264 * DEG) };
+const VIEW_HER = { cy: Math.cos(18 * DEG), sy: Math.sin(18 * DEG),
+                   sp: Math.sin(28 * DEG), cp: Math.cos(28 * DEG) };
+
+let view = VIEW_ISO;
+
+const TOL_MID = 2.5;
+const TOL_DOT = 0.994;
+const WALK_SPEED = 250;
+
+const canvas = document.getElementById('stage');
+const ctx = canvas.getContext('2d');
+const subEl = document.getElementById('sub');
+const statusEl = document.getElementById('status');
+const hintEl = document.getElementById('hint');
+const dateEl = document.getElementById('date');
+const fadeEl = document.getElementById('fade');
+const endEl = document.getElementById('end');
+const subtitleEl = document.getElementById('subtitle');
+
+let W = 0, H = 0, S = 180, OX = 0, OY = 0;
+
+function project(x, y, z) {
+  const u = x * view.cy - z * view.sy;
+  const w = (x * view.sy + z * view.cy) * view.sp - y * view.cp;
+  return { x: OX + u * S, y: OY + w * S };
+}
+
+/* ---------------- 构造工具 ---------------- */
+
+const AL = {
+  L1:  { top: '#f3e0d3', sideA: '#e5c9b6', sideB: '#d5b5a0', line: 'rgba(148,112,92,.5)' },
+  L1b: { top: '#f8e9df', sideA: '#ead1c0', sideB: '#dbbcaa', line: 'rgba(148,112,92,.5)' },
+  L2:  { top: '#e6efec', sideA: '#cfdfd9', sideB: '#b7ccc4', line: 'rgba(88,118,108,.45)' },
+  L2b: { top: '#eef5f2', sideA: '#dae8e2', sideB: '#c2d6ce', line: 'rgba(88,118,108,.45)' },
+  L3:  { top: '#f6e6cf', sideA: '#e8cda9', sideB: '#d7b98e', line: 'rgba(150,110,70,.45)' },
+  L3w: { top: '#fffdf8', sideA: '#f1e6d6', sideB: '#e3d4bf', line: 'rgba(165,135,100,.5)' },
+  L4:  { top: '#e1e5ee', sideA: '#c9d1e0', sideB: '#b0bacd', line: 'rgba(80,95,120,.45)' },
+  L4b: { top: '#e9edf5', sideA: '#d3dae8', sideB: '#bbc5d6', line: 'rgba(80,95,120,.45)' },
+  DOOR:{ top: '#9a7458', sideA: '#86603f', sideB: '#74513a', line: 'rgba(70,45,30,.55)' }
+};
+
+function P(o) {
+  return Object.assign({
+    axis: 'y', angle: 0, rotatable: false, step: Math.PI / 2,
+    maxTurns: Infinity, turns: 0, locked: false
+  }, o);
+}
+function C(part, x, y, z, pal, extra) {
+  return Object.assign({ part, local: { x, y, z }, pal, nb: [], poly: [] }, extra || {});
+}
+function B(part, x, y, z, sx, sy, sz, pal) {
+  return { part, center: { x, y, z }, size: { x: sx, y: sy, z: sz }, pal };
+}
+
+function rotLocal(p, axis, a) {
+  const c = Math.cos(a), s = Math.sin(a);
+  if (axis === 'y') return { x: p.x * c + p.z * s, y: p.y, z: -p.x * s + p.z * c };
+  if (axis === 'x') return { x: p.x, y: p.y * c - p.z * s, z: p.y * s + p.z * c };
+  return { x: p.x * c - p.y * s, y: p.x * s + p.y * c, z: p.z };
+}
+function toWorld(part, l) {
+  const r = rotLocal(l, part.axis, part.angle);
+  return { x: part.pivot.x + r.x, y: part.pivot.y + r.y, z: part.pivot.z + r.z };
+}
+
+/* ---------------- 四个关卡 ---------------- */
+
+/* =========================================================
+   旋转桥臂塔
+   链塔：第 n 格 = (n,n,0)，相邻层靠「对角台阶」贴边，任何
+   一格断开整条链就断。链格可以是静态的，也可以是「桥臂」——
+   绕 Y 轴旋转，初始翻到背面 (n,n,-4)，转回 0° 才接上。
+   桥臂 step 90°：从背面转 180°（两下）才到位。
+   ========================================================= */
+
+function towerPals() {
+  const out = [];
+  for (let n = 0; n < 10; n++) {
+    const t = n / 9;
+    out.push({
+      top: 'hsl(' + (30 - t*14) + ', ' + (40 - t*3) + '%, ' + (83 - t*17) + '%)',
+      sideA: 'hsl(' + (30 - t*14) + ', ' + (42 - t*3) + '%, ' + (72 - t*17) + '%)',
+      sideB: 'hsl(' + (30 - t*14) + ', ' + (44 - t*3) + '%, ' + (61 - t*17) + '%)',
+      line: 'rgba(140,100,80,.45)'
+    });
+  }
+  return out;
+}
+
+// 桥臂：pivot 在 (x,y+2,0)，格 local (0,-2,0)，绕 X 轴（向上翻）。
+// angle=0 → 格在 (x,y,0) 接上；angle=PI → 翻到塔上方 (x,y+4,0)。
+// 向上翻避免翻到背面 (z=-4) 与链格投影贴边导致点不中。
+function bridgePart(id, x, y, startAngle, maxTurns) {
+  return P({
+    id, pivot: { x, y: y + 2, z: 0 }, axis: 'x',
+    angle: (startAngle == null ? Math.PI : startAngle),
+    rotatable: true, step: Math.PI / 2,
+    maxTurns: (maxTurns == null ? 2 : maxTurns)
+  });
+}
+
+// 通用链塔生成器
+// opts: { bridges:[链位置..], decoys:[{x,y}..], gaps:[链位置..],
+//         giveSpare:备用格数, decoyGaps:[{x,y,level}..] }
+function buildPuzzle(opts) {
+  const PALS = towerPals();
+  const base = P({ id: 'base', pivot: { x: 0, y: 0, z: 0 } });
+  const parts = [base];
+  const cells = [];
+  let idx = 0;
+  const add = (part, x, y, z, pal, extra) => { cells.push(C(part, x, y, z, pal, extra)); return idx++; };
+
+  const byLayer = [];
+  for (let n = 0; n < 10; n++) {
+    byLayer[n] = [];
+    if (opts.gaps && opts.gaps.indexOf(n) >= 0) { byLayer[n].push(-1); continue; }
+    if (opts.bridges && opts.bridges.indexOf(n) >= 0) {
+      const arm = bridgePart('b' + n, n, n, opts.bridgeAngle, opts.bridgeTurns);
+      parts.push(arm);
+      byLayer[n].push(add(arm, 0, -2, 0, PALS[n], { level: n }));
+    } else {
+      byLayer[n].push(add(base, n, n, 0, PALS[n], { level: n }));
+    }
+  }
+
+  // 诱饵桥臂（不在链上，转了浪费预算）
+  if (opts.decoys) {
+    opts.decoys.forEach((d, i) => {
+      const arm = bridgePart('dec' + i, d.x, d.y, Math.PI, 2);
+      parts.push(arm);
+      add(arm, 0, -2, 0, PALS[Math.min(d.y, 9)], { level: d.y });
+    });
+  }
+
+  // 给予的备用格（起点旁边，你自己的台阶）
+  const spareIdx = [];
+  if (opts.giveSpare) {
+    for (let k = 0; k < opts.giveSpare; k++) {
+      spareIdx.push(add(base, 0, 0, 1 + k, PALS[0], { level: 0, spare: true }));
+    }
+  }
+
+  // 给予的缺口槽位
+  const slots = [];
+  if (opts.gaps) opts.gaps.forEach(g => slots.push({ x: g, y: g, z: 0, level: g }));
+  if (opts.decoyGaps) opts.decoyGaps.forEach(d => slots.push({ x: d.x, y: d.y, z: 0, level: d.level }));
+
+  // 塔身装饰：每层一块平台（缺口层不放，让断口可见）
+  const boxes = [];
+  for (let n = 0; n < 10; n++) {
+    if (opts.gaps && opts.gaps.indexOf(n) >= 0) continue;
+    boxes.push(B(base, n, n - 0.6, 0, 1.2, 1.2, 1.2, PALS[n]));
+  }
+
+  return { base, parts, cells, boxes, byLayer, spareIdx, slots };
+}
+
+/* ============ 第一关 · 第一面 · 旋转 ============ */
+
+function buildL1() {
+  // 4 座断桥，每座转一下回正；无诱饵，纯教学
+  const P = buildPuzzle({ bridges: [1, 3, 5, 7] });
+  return {
+    index: 0, name: '第一关 · 第一面', bg: '#ece3dc', date: '2019.4.11　阴',
+    hint: '<span><b>右键</b> 点断桥（每座转两下）</span><span><b>左键</b> 沿台阶走</span><span><b>R</b> 重来</span>',
+    parts: P.parts, cells: P.cells, boxes: P.boxes, byLayer: P.byLayer,
+    player: P.byLayer[0][0], her: P.byLayer[9][0], herGoal: -1,
+    startStatus: '塔断了四座桥', win: 'playerOn', target: P.byLayer[9][0],
+    winText: '你走到她身边了', rotBudget: 8,
+    opening: ['那天我在楼梯拐角第一次见到她，', '就再没忘记她低头的样子。'],
+    closing: ['我转动整座塔，只为让她的路，', '通向我站的地方。'],
+    status() {
+      const left = lv.rotBudget || 0;
+      const ok = bfs(lv.cells[lv.player], lv.cells[lv.target]).length > 0;
+      if (ok) { setStatus('路通了，上去找她', 'on'); return; }
+      if (left <= 0) { setStatus('路还是断的　·　R 重来', 'warn'); return; }
+      setStatus('还能转 ' + left + ' 次　·　塔断了四座桥', '');
+    }
+  };
+}
+
+/* ============ 第二关 · 巧合 · 旋转进阶 ============ */
+
+function buildL2() {
+  // 4 座断桥（每座转两下回正）+ 1 个诱饵
+  const P = buildPuzzle({ bridges: [2, 4, 6, 8], decoys: [{ x: 3, y: 5 }] });
+  return {
+    index: 1, name: '第二关 · 巧合', bg: '#e9eeec', date: '2019.5.06　小雨',
+    hint: '<span><b>右键</b> 点断桥（每座转两下）</span><span><b>左键</b> 走路</span><span><b>R</b> 重来</span>',
+    parts: P.parts, cells: P.cells, boxes: P.boxes, byLayer: P.byLayer,
+    player: P.byLayer[0][0], her: P.byLayer[9][0], herGoal: -1,
+    startStatus: '多了一块不属于这里的板', win: 'playerOn', target: P.byLayer[9][0],
+    winText: '你们站在同一层了', rotBudget: 8,
+    opening: ['我假装每一次相遇都是巧合，', '其实我算好了她会经过的每一个时刻。'],
+    closing: ['两条平行的路，在我这里，', '偷偷交会了一秒。'],
+    status() {
+      const left = lv.rotBudget || 0;
+      const ok = bfs(lv.cells[lv.player], lv.cells[lv.target]).length > 0;
+      if (ok) { setStatus('接上了', 'on'); return; }
+      if (left <= 0) { setStatus('还差一段　·　R 重来', 'warn'); return; }
+      setStatus('还能转 ' + left + ' 次', '');
+    }
+  };
+}
+
+/* ============ 第三关 · 最后一格 · 给予 ============ */
+
+function buildL3() {
+  // 三处缺口（点缺口把自己的格子给它）+ 两座断桥 + 一个诱饵缺口
+  const P = buildPuzzle({
+    bridges: [1, 8], gaps: [3, 5, 7], giveSpare: 3,
+    decoyGaps: [{ x: 3, y: 4, level: 4 }]
+  });
+  return {
+    index: 2, name: '第三关 · 最后一格', bg: '#f0e7d8', date: '2019.6.20　晴',
+    hint: '<span><b>左键</b> 点缺口，把自己的一格给它</span><span><b>右键</b> 转断桥</span><span><b>R</b> 重来</span>',
+    parts: P.parts, cells: P.cells, boxes: P.boxes, byLayer: P.byLayer,
+    player: P.byLayer[0][0], her: P.byLayer[9][0], herGoal: -1,
+    startStatus: '少了三格，还有两座断桥', win: 'playerOn', target: P.byLayer[9][0],
+    winText: '她就在眼前', rotBudget: 4,
+    give: { slots: P.slots, spare: P.spareIdx.slice(), pal: AL.L3 },
+    opening: ['如果我的全部，只够换她一段路，', '那我愿意，一块一块，拆下自己。'],
+    closing: ['她走过去的时候，没有回头。', '而我已经不剩什么了。'],
+    status() {
+      const left = lv.rotBudget || 0;
+      const sp = lv.give.spare.length;
+      const ok = bfs(lv.cells[lv.player], lv.cells[lv.target]).length > 0;
+      if (ok) { setStatus('路通了', 'on'); return; }
+      setStatus('还能转 ' + left + ' 次　·　手里还剩 ' + sp + ' 格',
+                sp === 0 ? 'warn' : '');
+    }
+  };
+}
+
+/* ============ 第四关 · 暗面 · 旋转 + 注视 + 双视角 ============ */
+
+function buildL4() {
+  // 6 座断桥 + 2 个诱饵 + 注视扫层 + 空格双视角
+  const P = buildPuzzle({
+    bridges: [1, 2, 4, 5, 7, 8],
+    decoys: [{ x: 3, y: 5 }, { x: 6, y: 8 }]
+  });
+  return {
+    index: 3, name: '第四关 · 暗面', bg: '#dfe3ea', date: '',
+    hint: '<span><b>右键</b> 转断桥</span><span><b>空格</b> 看她的视角</span><span><b>左键</b> 走</span><span><b>R</b> 重来</span>',
+    parts: P.parts, cells: P.cells, boxes: P.boxes, byLayer: P.byLayer,
+    player: P.byLayer[0][0], her: P.byLayer[9][0], herGoal: -1,
+    startStatus: '她看着你，别乱动', win: 'playerOn', target: P.byLayer[9][0],
+    winText: '你走到她面前了', rotBudget: 12,
+    gaze: { scan: 0.45, level: 5, t: 0.45 },
+    opening: ['塔有十层，光只照在正面。', '我一直在她看不见的那一面，搭着她看不见的路。'],
+    closing: ['只有从这里看，', '那些路才是连着的。'],
+    status() {
+      const left = lv.rotBudget || 0;
+      const lv2 = lv.gaze.level;
+      const ok = bfs(lv.cells[lv.player], lv.cells[lv.target]).length > 0;
+      if (ok) { setStatus('路通了，趁她移开视线走', 'on'); return; }
+      if (left <= 0) { setStatus('你转不动了　·　R 重来', 'warn'); return; }
+      setStatus('还能转 ' + left + ' 次　·　视线在第 ' + (lv2 + 1) + ' 层',
+                lv.playerActor.cell && lv.playerActor.cell.level === lv2 ? 'warn' : '');
+    }
+  };
+}
+
+const BUILDERS = [buildL1, buildL2, buildL3, buildL4];
+
+/* ---------------- 状态 ---------------- */
+
+let lv = null;
+let levelIndex = 0;
+let busy = false;
+let rot = null;
+let flying = null;
+let transition = false;
+let sparks = [];
+let connKeys = new Set();
+let ending = null;
+
+/* ---------------- 装载 ---------------- */
+
+function loadLevel(i) {
+  levelIndex = i;
+  lv = BUILDERS[i]();
+
+  view = VIEW_ISO;
+  busy = false; rot = null; flying = null; ending = null;
+  sparks = []; connKeys = new Set();
+
+  for (const p of lv.parts) { p.turns = 0; p.locked = false; }
+  lv.cells.forEach((c, k) => { c.uid = k; c.nb = []; c.poly = []; });
+
+  lv.playerActor = makeActor(lv.cells[lv.player], 1.0, '#ffffff', '#5f5046');
+  lv.herActor = makeActor(lv.cells[lv.her], 1.08, '#e0936c', '#7d4128');
+  lv.herGoalCell = lv.herGoal >= 0 ? lv.cells[lv.herGoal] : null;
+  lv.herPending = false;
+  lv.herTimer = 0;
+  lv.deferWin = false;
+
+  subEl.textContent = lv.name;
+  hintEl.innerHTML = lv.hint;
+  document.body.style.background = lv.bg;
+
+  if (lv.date) {
+    dateEl.textContent = lv.date;
+    dateEl.classList.remove('show');
+    setTimeout(() => dateEl.classList.add('show'), 480);
+  } else {
+    dateEl.classList.remove('show');
+  }
+
+  endEl.classList.remove('on');
+
+  // 开场字幕
+  if (lv.opening) {
+    setTimeout(() => showSubtitle(lv.opening), 1100);
+  } else {
+    showSubtitle(null);
+  }
+
+  computeWorld();
+  fitView();
+  updatePolys();
+  rebuildGraph();
+  snapActors();
+  nudgeHer(0.2);
+}
+
+function setStatus(text, cls) {
+  statusEl.textContent = text;
+  statusEl.className = 'status' + (cls ? ' ' + cls : '');
+}
+
+/* ---------------- 字幕 ---------------- */
+
+let subtitleTimer = null;
+function showSubtitle(lines, holdMs) {
+  subtitleEl.innerHTML = '';
+  if (subtitleTimer) clearTimeout(subtitleTimer);
+  if (!lines || !lines.length) return;
+  lines.forEach((text, i) => {
+    const d = document.createElement('span');
+    d.className = 'line';
+    d.textContent = text;
+    subtitleEl.appendChild(d);
+    setTimeout(() => d.classList.add('show'), 350 + i * 650);
+  });
+  const total = 350 + lines.length * 650 + (holdMs || 3400);
+  subtitleTimer = setTimeout(() => {
+    subtitleEl.querySelectorAll('.line').forEach(d => d.classList.remove('show'));
+  }, total);
+}
+
+/* ---------------- 角色 ---------------- */
+
+function makeActor(cell, k, body, line) {
+  return {
+    cell, k, body, line,
+    pos: { x: 0, y: 0 },
+    from: null, to: null, next: null,
+    t: 0, dur: 0.2, queue: [], moving: false, fall: null,
+    wait: 0, pausedOnce: false
+  };
+}
+
+function stepActor(a, dt) {
+  if (!a || a.fall) return;
+
+  if (a.wait > 0) { a.wait -= dt; return; }
+
+  if (a.to) {
+    a.t += dt / a.dur;
+    const k = Math.min(a.t, 1);
+    const e = k * k * (3 - 2 * k);
+    a.pos.x = a.from.x + (a.to.x - a.from.x) * e;
+    a.pos.y = a.from.y + (a.to.y - a.from.y) * e;
+    if (k >= 1) {
+      a.cell = a.next;
+      a.to = null; a.next = null; a.moving = false;
+
+      // 她走过你面前时，脚步顿了一下
+      if (a === lv.herActor && lv.pauseCell && a.cell === lv.cells[lv.pauseCell] && !a.pausedOnce) {
+        a.pausedOnce = true;
+        a.wait = 0.55;
+      }
+    }
+    return;
+  }
+
+  if (a.queue.length) {
+    const target = a.queue.shift();
+    a.from = { x: a.pos.x, y: a.pos.y };
+    a.to = { x: target.screen.x, y: target.screen.y };
+    a.next = target;
+    const d = Math.hypot(a.to.x - a.from.x, a.to.y - a.from.y);
+    a.dur = Math.max(0.09, d / WALK_SPEED);
+    a.t = 0;
+    a.moving = true;
+    return;
+  }
+
+  if (a.cell && a.cell.screen) {
+    a.pos.x = a.cell.screen.x;
+    a.pos.y = a.cell.screen.y;
+  }
+}
+
+function snapActors() {
+  for (const a of [lv.playerActor, lv.herActor]) {
+    if (!a || !a.cell) continue;
+    a.pos.x = a.cell.screen.x;
+    a.pos.y = a.cell.screen.y;
+    a.queue = []; a.to = null; a.next = null; a.moving = false;
+  }
+}
+
+function nudgeHer(delay) {
+  if (!lv.herActor) return;
+  lv.herPending = true;
+  lv.herTimer = delay;
+}
+
+function startHer() {
+  const a = lv.herActor, goal = lv.herGoalCell;
+  if (!a || !goal) return;
+  if (a.to || a.queue.length) return;
+  const path = bfs(a.cell, goal);
+  if (path.length) a.queue.push(...path);
+}
+
+/* ---------------- 世界与图 ---------------- */
+
+function computeWorld() {
+  for (const c of lv.cells) {
+    c.world = toWorld(c.part, c.local);
+    c.screen = project(c.world.x, c.world.y, c.world.z);
+  }
+  for (const b of lv.boxes) b.world = toWorld(b.part, b.center);
+}
+
+function fitView() {
+  let minU = 1e9, maxU = -1e9, minW = 1e9, maxW = -1e9;
+
+  const take = (x, y, z) => {
+    const u = x * view.cy - z * view.sy;
+    const w = (x * view.sy + z * view.cy) * view.sp - y * view.cp;
+    if (u < minU) minU = u;
+    if (u > maxU) maxU = u;
+    if (w < minW) minW = w;
+    if (w > maxW) maxW = w;
+  };
+
+  for (const c of lv.cells) {
+    if (c.gone) continue;
+    take(c.world.x, c.world.y, c.world.z);
+  }
+  for (const b of lv.boxes) {
+    take(b.world.x, b.world.y + b.size.y / 2, b.world.z);
+    take(b.world.x, b.world.y - b.size.y / 2, b.world.z);
+  }
+
+  if (minU > maxU) return;
+
+  const spanU = (maxU - minU) + 2.1;
+  const spanW = (maxW - minW) + 2.1;
+
+  S = Math.min(W * 0.9 / spanU, H * 0.9 / spanW, 210);
+  OX = W / 2 - (minU + maxU) / 2 * S;
+  OY = H / 2 - (minW + maxW) / 2 * S;
+
+  for (const c of lv.cells) {
+    c.screen = project(c.world.x, c.world.y, c.world.z);
+  }
+}
+
+function cellPoly(c) {
+  if (!c.world) return [];
+  const s = 0.5, w = c.world;
+  return [
+    project(w.x - s, w.y, w.z - s),
+    project(w.x + s, w.y, w.z - s),
+    project(w.x + s, w.y, w.z + s),
+    project(w.x - s, w.y, w.z + s)
+  ];
+}
+
+function polyAt(x, y, z) {
+  const s = 0.5;
+  return [
+    project(x - s, y, z - s), project(x + s, y, z - s),
+    project(x + s, y, z + s), project(x - s, y, z + s)
+  ];
+}
+
+function updatePolys() {
+  for (const c of lv.cells) c.poly = c.gone ? [] : cellPoly(c);
+}
+
+function matchEdges(a, b) {
+  for (let i = 0; i < 4; i++) {
+    const a0 = a.poly[i], a1 = a.poly[(i + 1) % 4];
+    const amx = (a0.x + a1.x) / 2, amy = (a0.y + a1.y) / 2;
+    const adx = a1.x - a0.x, ady = a1.y - a0.y;
+    const alen = Math.hypot(adx, ady);
+    if (alen < 1e-6) continue;
+
+    for (let j = 0; j < 4; j++) {
+      const b0 = b.poly[j], b1 = b.poly[(j + 1) % 4];
+      const bmx = (b0.x + b1.x) / 2, bmy = (b0.y + b1.y) / 2;
+      if (Math.hypot(amx - bmx, amy - bmy) > TOL_MID) continue;
+
+      const bdx = b1.x - b0.x, bdy = b1.y - b0.y;
+      const blen = Math.hypot(bdx, bdy);
+      if (blen < 1e-6) continue;
+
+      const dot = (adx * bdx + ady * bdy) / (alen * blen);
+      if (Math.abs(dot) < TOL_DOT) continue;
+
+      return { x: (amx + bmx) / 2, y: (amy + bmy) / 2 };
+    }
+  }
+  return null;
+}
+
+function isReal(a, b) {
+  const dx = a.world.x - b.world.x;
+  const dy = a.world.y - b.world.y;
+  const dz = a.world.z - b.world.z;
+  if (Math.abs(dy) > 0.02) return false;
+  return (Math.abs(Math.abs(dx) - 1) < 0.02 && Math.abs(dz) < 0.02) ||
+         (Math.abs(Math.abs(dz) - 1) < 0.02 && Math.abs(dx) < 0.02);
+}
+
+function rebuildGraph() {
+  updatePolys();
+  for (const c of lv.cells) c.nb = [];
+  lv.edges = [];
+
+  const next = new Set();
+  const live = lv.cells.filter(c => !c.gone);
+
+  for (let i = 0; i < live.length; i++) {
+    for (let j = i + 1; j < live.length; j++) {
+      const hit = matchEdges(live[i], live[j]);
+      if (!hit) continue;
+
+      const real = isReal(live[i], live[j]);
+      live[i].nb.push({ cell: live[j], real });
+      live[j].nb.push({ cell: live[i], real });
+      lv.edges.push({ a: live[i], b: live[j], real, hit });
+
+      const key = live[i].uid + '-' + live[j].uid;
+      next.add(key);
+      if (connKeys.size && !connKeys.has(key)) sparks.push({ x: hit.x, y: hit.y, t: 0 });
+    }
+  }
+
+  connKeys = next;
+  updateStatusBar();
+}
+
+function neighbors(c) { return c.nb.map(e => e.cell); }
+
+function edgeInfo(a, b) {
+  for (const e of a.nb) if (e.cell === b) return e;
+  return null;
+}
+
+function bfs(from, to) {
+  if (!from || !to || from === to) return [];
+  const prev = new Map();
+  prev.set(from, null);
+  const q = [from];
+  while (q.length) {
+    const cur = q.shift();
+    if (cur === to) break;
+    for (const e of cur.nb) {
+      if (!prev.has(e.cell)) { prev.set(e.cell, cur); q.push(e.cell); }
+    }
+  }
+  if (!prev.has(to)) return [];
+  const path = [];
+  let node = to;
+  while (node !== from) { path.unshift(node); node = prev.get(node); }
+  return path;
+}
+
+/* ---------------- 状态栏 ---------------- */
+
+function updateStatusBar() {
+  if (!lv) return;
+  if (lv.status) { lv.status(); return; }
+
+  const ok = bfs(lv.playerActor.cell, lv.herActor.cell).length > 0;
+  setStatus(ok ? '路通了' : lv.startStatus, ok ? 'on' : '');
+}
+
+/* ---------------- 旋转 ---------------- */
+
+function tryRotate(part) {
+  if (busy || !part || !part.rotatable || part.locked) return;
+  if (part.turns >= part.maxTurns) { setStatus('这块转不动了', 'warn'); return; }
+
+  if (lv.rotBudget !== undefined) {
+    if (lv.rotBudget <= 0) { setStatus('你转不动了', 'warn'); return; }
+    lv.rotBudget--;
+  }
+
+  busy = true;
+  part.turns++;
+  if (part.turns >= part.maxTurns) part.locked = true;
+  rot = { part, from: part.angle, to: part.angle + part.step, t: 0, dur: 0.4 };
+}
+
+function updateRotation(dt) {
+  if (!rot) return;
+  rot.t += dt / rot.dur;
+  const k = Math.min(rot.t, 1);
+  const e = k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2;
+  rot.part.angle = rot.from + (rot.to - rot.from) * e;
+
+  if (k >= 1) {
+    rot.part.angle = rot.to;
+    rot = null;
+    busy = false;
+
+    // 你一动世界，她就回头看你
+    if (lv.gaze) { lv.gaze.phase = 'look'; lv.gaze.t = 1.3; }
+
+    computeWorld();
+    updatePolys();
+    rebuildGraph();
+    snapActors();
+    nudgeHer(0.55);
+    checkWin();
+    updateStatusBar();
+  }
+}
+
+/* ---------------- 输入 ---------------- */
+
+function pointInPoly(p, poly) {
+  let inside = false;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const xi = poly[i].x, yi = poly[i].y, xj = poly[j].x, yj = poly[j].y;
+    if (((yi > p.y) !== (yj > p.y)) &&
+        (p.x < (xj - xi) * (p.y - yi) / (yj - yi) + xi)) inside = !inside;
+  }
+  return inside;
+}
+
+function depthOf(c) { return c.world.x + c.world.y + c.world.z; }
+
+function cellAt(p) {
+  let best = null, bd = -Infinity;
+  for (const c of lv.cells) {
+    if (c.gone || !c.poly.length) continue;
+    if (pointInPoly(p, c.poly) && depthOf(c) > bd) { bd = depthOf(c); best = c; }
+  }
+  return best;
+}
+
+// 优先返回「玩家当前格的邻居」里命中点击位置的那格，
+// 解决 10 层交叉时多层重叠导致点不中想走的那层的问题。
+function neighborAt(p, from) {
+  if (!from) return null;
+  for (const e of from.nb) {
+    const c = e.cell;
+    if (!c.gone && c.poly.length && pointInPoly(p, c.poly)) return c;
+  }
+  return null;
+}
+
+function slotAt(p) {
+  if (!lv.give) return -1;
+  for (let i = 0; i < lv.give.slots.length; i++) {
+    const s = lv.give.slots[i];
+    if (s.built) continue;
+    if (pointInPoly(p, polyAt(s.x, s.y, s.z))) return i;
+  }
+  return -1;
+}
+
+canvas.addEventListener('contextmenu', e => e.preventDefault());
+
+canvas.addEventListener('mousedown', e => {
+  if (busy || transition || ending) return;
+  const p = { x: e.clientX, y: e.clientY };
+
+  if (e.button === 0) {
+    if (lv.give) {
+      const si = slotAt(p);
+      if (si >= 0) { giveCell(si); return; }
+    }
+    // 优先走邻居（多层交叉时点得中想走的那层）
+    let c = neighborAt(p, lv.playerActor.cell);
+    if (!c) c = cellAt(p);
+    if (c) tryWalk(c);
+  } else if (e.button === 2) {
+    const c = cellAt(p);
+    if (c && c.part.rotatable) tryRotate(c.part);
+    else if (lv.index === 3) tryRotate(lv.parts[1]);
+  }
+});
+
+window.addEventListener('keydown', e => {
+  if (transition) return;
+  if (e.key === 'r' || e.key === 'R') { restartLevel(false); return; }
+
+  if (e.key === ' ' && lv.index === 3) {
+    e.preventDefault();
+    view = (view === VIEW_ISO) ? VIEW_HER : VIEW_ISO;
+    computeWorld(); fitView(); updatePolys();
+    rebuildGraph();
+    snapActors();
+    updateStatusBar();
+    return;
+  }
+
+  if (busy || ending) return;
+
+  const dirs = {
+    w: { x: VIEW_ISO.cy, y: -VIEW_ISO.sy * 1.4 },
+    s: { x: -VIEW_ISO.cy, y: VIEW_ISO.sy * 1.4 },
+    a: { x: -VIEW_ISO.cy, y: -VIEW_ISO.sy * 1.4 },
+    d: { x: VIEW_ISO.cy, y: VIEW_ISO.sy * 1.4 }
+  };
+  const dir = dirs[e.key.toLowerCase()];
+  if (!dir) return;
+
+  let best = null, bestDot = 0.55;
+  const from = lv.playerActor.cell;
+  for (const nb of neighbors(from)) {
+    const dx = nb.screen.x - from.screen.x;
+    const dy = nb.screen.y - from.screen.y;
+    const len = Math.hypot(dx, dy);
+    if (len < 1) continue;
+    const dot = (dx / len) * dir.x + (dy / len) * dir.y;
+    if (dot > bestDot) { bestDot = dot; best = nb; }
+  }
+  if (best) tryWalk(best);
+});
+
+endEl.addEventListener('click', () => {
+  endEl.classList.remove('on');
+  loadLevel(0);
+});
+
+/* ---------------- 行走 ---------------- */
+
+function tryWalk(target) {
+  const a = lv.playerActor;
+  if (!a.cell || busy) return;
+
+  const info = edgeInfo(a.cell, target);
+  if (!info) return;
+
+  if (target.final) { startEnding(); return; }
+
+  // 视线扫层模式：她的视线落在这层时，你不能动
+  if (lv.gaze && lv.gaze.scan && a.cell.level === lv.gaze.level) {
+    setStatus('她的视线正看着这一层，别动', 'warn');
+    return;
+  }
+
+  // 传统注视模式：她看着你时，你不能动
+  if (lv.gaze && !lv.gaze.scan && lv.gaze.phase === 'look') {
+    setStatus('她在看你，别动', 'warn');
+    return;
+  }
+
+  const path = bfs(a.cell, target);
+  if (path.length) a.queue.push(...path);
+}
+
+/* ---------------- 给予 ---------------- */
+
+function giveCell(si) {
+  const g = lv.give;
+
+  let idx, self = false;
+  if (g.spare.length) idx = g.spare.pop();
+  else { idx = lv.player; self = true; }
+
+  const src = lv.cells[idx];
+  if (!src || src.gone) return;
+
+  const slot = g.slots[si];
+  const target = { x: slot.x, y: slot.y, z: slot.z };
+
+  slot.built = true;
+  busy = true;
+
+  flying = {
+    from: { x: src.world.x, y: src.world.y, z: src.world.z },
+    to: target, t: 0, dur: 0.6, pal: AL.L3w,
+    done() {
+      src.gone = true;
+      const nc = C(lv.parts[0], target.x, target.y, target.z, g.pal || AL.L3);
+      nc.level = target.level;
+      nc.uid = 'b' + si;
+      lv.cells.push(nc);
+
+      flying = null;
+      busy = false;
+      computeWorld(); updatePolys(); rebuildGraph();
+      nudgeHer(0.45);
+      checkWin();
+
+      if (self) {
+        // 把最后这一格也给了她——然后你没有地方站了
+        lv.gaveSelf = true;
+        busy = true;
+        lv.playerActor.cell = null;
+        lv.playerActor.fall = { t: 0, vy: 0 };
+        updateStatusBar();
+      }
+    }
+  };
+}
+
+/* ---------------- 她的注视 ---------------- */
+
+function updateGaze(dt) {
+  if (!lv.gaze || ending) return;
+  const g = lv.gaze;
+
+  // 视线扫过 10 层：每 scan 秒，视线从这一层移到下一层
+  if (g.scan) {
+    g.t -= dt;
+    if (g.t <= 0) {
+      g.level = (g.level + 1) % 10;
+      g.t = g.scan;
+      updateStatusBar();
+    }
+    return;
+  }
+
+  // 传统 look/away 周期
+  g.t -= dt;
+  if (g.t <= 0) {
+    if (g.phase === 'away') { g.phase = 'look'; g.t = g.look; }
+    else { g.phase = 'away'; g.t = g.away; }
+    updateStatusBar();
+  }
+}
+
+/* ---------------- 失败与结局 ---------------- */
+
+function startFall() {
+  const a = lv.playerActor;
+  a.fall = { t: 0, vy: 0 };
+  busy = true;
+  setStatus('踩空了', 'warn');
+  setTimeout(() => { if (!ending) restartLevel(true); }, 850);
+}
+
+function restartLevel(silent) {
+  if (transition) return;
+  if (silent) {
+    loadLevel(levelIndex);
+    return;
+  }
+  transition = true;
+  fadeEl.classList.add('on');
+  setTimeout(() => {
+    loadLevel(levelIndex);
+    fadeEl.classList.remove('on');
+    transition = false;
+  }, 480);
+}
+
+function startEnding() {
+  ending = { t: 0, done: false };
+  busy = true;
+  const a = lv.playerActor;
+  a.fall = { t: 0, vy: 0 };
+  setStatus('', '');
+}
+
+function updateEnding(dt) {
+  if (!ending) return;
+  ending.t += dt;
+  const a = lv.playerActor;
+  if (a.fall) {
+    a.fall.t += dt;
+    a.fall.vy += 780 * dt;
+    a.pos.y += a.fall.vy * dt;
+  }
+  if (ending.t > 1.9 && !ending.done) {
+    ending.done = true;
+    markDone(levelIndex);
+    endEl.classList.add('on');
+  }
+}
+
+/* ---------------- 过关 ---------------- */
+
+function checkWin() {
+  if (!lv || transition || ending || lv.deferWin) return;
+
+  if (lv.win === 'her') {
+    const a = lv.herActor;
+    if (a && a.cell && lv.herGoalCell && a.cell === lv.herGoalCell) {
+      lv.deferWin = true;
+      setStatus(lv.winText, 'on');
+      if (lv.closing) showSubtitle(lv.closing, 2600);
+      setTimeout(nextLevel, 3200);
+    }
+  }
+
+  if (lv.win === 'playerOn') {
+    const target = lv.cells[lv.target];
+    if (target && lv.playerActor.cell === target) {
+      lv.deferWin = true;
+      setStatus(lv.winText, 'on');
+      if (lv.closing) showSubtitle(lv.closing, 2600);
+      setTimeout(nextLevel, 3200);
+    }
+  }
+}
+
+function nextLevel() {
+  markDone(levelIndex);
+  if (levelIndex >= 3) return;
+  transition = true;
+  fadeEl.classList.add('on');
+  setTimeout(() => {
+    loadLevel(levelIndex + 1);
+    fadeEl.classList.remove('on');
+    transition = false;
+  }, 620);
+}
+
+/* ---------------- 绘制 ---------------- */
+
+function polyPath(pts) {
+  ctx.beginPath();
+  ctx.moveTo(pts[0].x, pts[0].y);
+  for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
+  ctx.closePath();
+}
+
+function fillPoly(pts, color, line) {
+  polyPath(pts);
+  ctx.fillStyle = color; ctx.fill();
+  if (line) { ctx.strokeStyle = line; ctx.lineWidth = 0.8; ctx.stroke(); }
+}
+
+function facePoints(w, hx, hy, hz) {
+  const t = [
+    project(w.x - hx, w.y + hy, w.z - hz),
+    project(w.x + hx, w.y + hy, w.z - hz),
+    project(w.x + hx, w.y + hy, w.z + hz),
+    project(w.x - hx, w.y + hy, w.z + hz)
+  ];
+  const b = [
+    project(w.x - hx, w.y - hy, w.z - hz),
+    project(w.x + hx, w.y - hy, w.z - hz),
+    project(w.x + hx, w.y - hy, w.z + hz),
+    project(w.x - hx, w.y - hy, w.z + hz)
+  ];
+  return { t, b };
+}
+
+function drawBlock(w, sx, sy, sz, pal) {
+  const f = facePoints(w, sx / 2, sy / 2, sz / 2);
+  fillPoly([f.t[1], f.t[2], f.b[2], f.b[1]], pal.sideB, pal.line);
+  fillPoly([f.t[2], f.t[3], f.b[3], f.b[2]], pal.sideA, pal.line);
+  fillPoly(f.t, pal.top, pal.line);
+}
+
+function drawCell(c) {
+  if (c.gone || !c.world) return;
+  const w = c.world;
+  const top = {
+    x: w.x, y: w.y - 0.17, z: w.z
+  };
+  drawBlock(top, 0.98, 0.34, 0.98, c.pal);
+}
+
+function drawSlots() {
+  if (!lv.give) return;
+  for (const s of lv.give.slots) {
+    if (s.built) continue;
+    const poly = polyAt(s.x, s.y, s.z);
+    polyPath(poly);
+    ctx.fillStyle = 'rgba(190,158,116,.09)';
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(178,138,92,.45)';
+    ctx.lineWidth = 1.1;
+    ctx.setLineDash([5, 5]);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+}
+
+function drawGaze() {
+  if (!lv.gaze || !lv.herActor) return;
+
+  // 视线扫层模式：光晕落在视线扫到的层
+  if (lv.gaze.scan) {
+    const cell = lv.byLayer && lv.byLayer[lv.gaze.level] ? lv.byLayer[lv.gaze.level][0] : null;
+    if (!cell || !cell.screen) return;
+    const p = cell.screen;
+    const t = performance.now() / 1000;
+    const r = 70 + Math.sin(t * 3) * 6;
+    const grad = ctx.createRadialGradient(p.x, p.y, 6, p.x, p.y, r);
+    grad.addColorStop(0, 'rgba(214,138,96,.24)');
+    grad.addColorStop(1, 'rgba(214,138,96,0)');
+    ctx.fillStyle = grad;
+    ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, Math.PI * 2); ctx.fill();
+    return;
+  }
+
+  // 传统 look/away：她看着你时，她身边泛起光
+  if (lv.gaze.phase !== 'look') return;
+  const p = lv.herActor.pos;
+  const t = performance.now() / 1000;
+  const r = 148 + Math.sin(t * 2) * 8;
+  const grad = ctx.createRadialGradient(p.x, p.y - 14, 8, p.x, p.y - 14, r);
+  grad.addColorStop(0, 'rgba(214,138,96,.17)');
+  grad.addColorStop(1, 'rgba(214,138,96,0)');
+  ctx.fillStyle = grad;
+  ctx.beginPath(); ctx.arc(p.x, p.y - 14, r, 0, Math.PI * 2); ctx.fill();
+}
+
+function drawFigure(a) {
+  if (!a || !a.pos) return;
+  const k = a.k;
+  const bob = a.moving ? Math.sin(performance.now() / 1000 * 16) * 1.6 : 0;
+  const x = a.pos.x, y = a.pos.y + bob;
+
+  ctx.save();
+  ctx.translate(a.pos.x, a.pos.y + 1);
+  ctx.scale(1, 0.36);
+  ctx.beginPath(); ctx.arc(0, 0, 6 * k, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(70,52,42,.13)'; ctx.fill();
+  ctx.restore();
+
+  ctx.save();
+  ctx.translate(x, y);
+
+  ctx.beginPath();
+  ctx.moveTo(-5.4 * k, 0); ctx.lineTo(5.4 * k, 0);
+  ctx.lineTo(3.4 * k, -14 * k); ctx.lineTo(-3.4 * k, -14 * k);
+  ctx.closePath(); ctx.fillStyle = a.body; ctx.fill();
+
+  ctx.beginPath();
+  ctx.moveTo(-4.0 * k, -14 * k); ctx.lineTo(4.0 * k, -14 * k); ctx.lineTo(0, -30 * k);
+  ctx.closePath(); ctx.fillStyle = a.body; ctx.fill();
+
+  ctx.beginPath();
+  ctx.moveTo(-5.4 * k, 0); ctx.lineTo(-3.4 * k, -14 * k);
+  ctx.lineTo(-4.0 * k, -14 * k); ctx.lineTo(0, -30 * k);
+  ctx.lineTo(4.0 * k, -14 * k); ctx.lineTo(3.4 * k, -14 * k);
+  ctx.lineTo(5.4 * k, 0);
+  ctx.strokeStyle = a.line; ctx.lineWidth = 1.3; ctx.stroke();
+
+  ctx.restore();
+}
+
+function drawSparks(dt) {
+  for (let i = sparks.length - 1; i >= 0; i--) {
+    const s = sparks[i];
+    s.t += dt;
+    const k = s.t / 0.7;
+    if (k >= 1) { sparks.splice(i, 1); continue; }
+    ctx.beginPath();
+    ctx.arc(s.x, s.y, 6 + k * 26, 0, Math.PI * 2);
+    ctx.strokeStyle = 'rgba(190,120,88,' + (0.42 * (1 - k)) + ')';
+    ctx.lineWidth = 1.2; ctx.stroke();
+  }
+}
+
+function render() {
+  ctx.clearRect(0, 0, W, H);
+  ctx.fillStyle = lv.bg;
+  ctx.fillRect(0, 0, W, H);
+
+  computeWorld();
+  updatePolys();
+
+  drawSlots();
+
+  const items = [];
+  for (const b of lv.boxes) {
+    const hx = b.size.x / 2, hy = b.size.y / 2, hz = b.size.z / 2;
+    // 用最远角做深度，避免大块塔身盖住它身后的格子
+    items.push({ d: (b.world.x - hx) + (b.world.y - hy) + (b.world.z - hz), box: b });
+  }
+  for (const c of lv.cells) {
+    if (c.gone) continue;
+    items.push({ d: c.world.x + c.world.y + c.world.z, cell: c });
+  }
+  items.sort((p, q) => p.d - q.d);
+
+  for (const it of items) {
+    if (it.box) drawBlock(it.box.world, it.box.size.x, it.box.size.y, it.box.size.z, it.box.pal);
+    else drawCell(it.cell);
+  }
+
+  if (flying) {
+    const k = Math.min(flying.t / flying.dur, 1);
+    const e = k * k * (3 - 2 * k);
+    const wx = flying.from.x + (flying.to.x - flying.from.x) * e;
+    const wy = flying.from.y + (flying.to.y - flying.from.y) * e + Math.sin(Math.PI * k) * 0.9;
+    const wz = flying.from.z + (flying.to.z - flying.from.z) * e;
+    drawBlock({ x: wx, y: wy, z: wz }, 0.9, 0.3, 0.9, flying.pal);
+  }
+
+  drawGaze();
+  for (const c of lv.cells) {
+    if (c.door && !c.gone) {
+      const turn = Math.abs(Math.sin(c.part.angle)) > 0.5;
+      drawBlock({ x: c.world.x, y: c.world.y + 0.56, z: c.world.z },
+                turn ? 0.86 : 0.12, 1.12, turn ? 0.12 : 0.86, AL.DOOR);
+    }
+  }
+  drawFigure(lv.herActor);
+  drawFigure(lv.playerActor);
+}
+
+/* ---------------- 主循环 ---------------- */
+
+let last = performance.now();
+
+function loop(now) {
+  const dt = Math.min((now - last) / 1000, 0.05);
+  last = now;
+
+  updateGaze(dt);
+  updateRotation(dt);
+  updateEnding(dt);
+  if (lv.update) lv.update(dt);
+
+  if (flying) {
+    flying.t += dt;
+    if (flying.t >= flying.dur) flying.done();
+  }
+
+  if (lv.herPending) {
+    lv.herTimer -= dt;
+    if (lv.herTimer <= 0) { lv.herPending = false; startHer(); }
+  }
+
+  stepActor(lv.playerActor, dt);
+  stepActor(lv.herActor, dt);
+
+  // 第三关：把最后一格也给了她之后，你自己往下掉
+  if (!ending && lv.playerActor && lv.playerActor.fall) {
+    const f = lv.playerActor.fall;
+    f.t += dt;
+    f.vy += 760 * dt;
+    lv.playerActor.pos.y += f.vy * dt;
+  }
+
+  if (!lv.deferWin && !transition && !ending) checkWin();
+
+  render();
+  drawSparks(dt);
+
+  requestAnimationFrame(loop);
+}
+
+
+/* ---------------- 章节选择 ---------------- */
+
+const LEVEL_META = [
+  { num: '一', nm: '第一面', mech: '旋转' },
+  { num: '二', nm: '巧合', mech: '折叠' },
+  { num: '三', nm: '最后一格', mech: '给予' },
+  { num: '四', nm: '暗面', mech: '双视角' }
+];
+
+const selectEl = document.getElementById('select');
+const gridEl = document.getElementById('selGrid');
+const menuBtn = document.getElementById('menuBtn');
+
+let doneList = [];
+try { doneList = JSON.parse(localStorage.getItem('gzm_done') || '[]') || []; } catch (err) { doneList = []; }
+
+function buildSelect() {
+  gridEl.innerHTML = '';
+  LEVEL_META.forEach((m, i) => {
+    const b = document.createElement('button');
+    b.className = 'card' + (doneList.indexOf(i) >= 0 ? ' done' : '');
+    b.innerHTML = '<span class="num">第 ' + m.num + ' 章</span>' +
+                  '<span class="nm">' + m.nm + '</span>' +
+                  '<span class="mech">' + m.mech + '</span>';
+    b.addEventListener('click', () => {
+      selectEl.classList.add('hide');
+      loadLevel(i);
+    });
+    gridEl.appendChild(b);
+  });
+}
+buildSelect();
+
+function markDone(i) {
+  if (doneList.indexOf(i) < 0) {
+    doneList.push(i);
+    try { localStorage.setItem('gzm_done', JSON.stringify(doneList)); } catch (err) {}
+    buildSelect();
+  }
+}
+
+menuBtn.addEventListener('click', () => { selectEl.style.display = 'flex'; selectEl.classList.remove('hide'); });
+
+/* ---------------- 启动 ---------------- */
+
+function resize() {
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  W = window.innerWidth; H = window.innerHeight;
+  canvas.width = Math.round(W * dpr);
+  canvas.height = Math.round(H * dpr);
+  canvas.style.width = W + 'px';
+  canvas.style.height = H + 'px';
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+  S = Math.min(W / 7.4, H / 5.8);
+
+  if (lv) { computeWorld(); fitView(); updatePolys(); }
+}
+
+window.addEventListener('resize', resize);
+
+const params = new URLSearchParams(location.search);
+const pv = parseInt(params.get('lv') || '0', 10);
+const hasParam = pv >= 1 && pv <= 4;
+const startLv = hasParam ? pv - 1 : 0;
+
+resize();
+loadLevel(startLv);
+render();
+requestAnimationFrame(loop);
+
+if (hasParam) { selectEl.style.display = 'none'; selectEl.classList.add('hide'); }
+</script>
+</body>
+</html>
